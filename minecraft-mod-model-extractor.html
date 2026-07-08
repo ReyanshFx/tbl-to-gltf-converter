@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minecraft Mod Model Extractor — .jar to .gltf, in bulk</title>
+<meta name="description" content="Upload a Minecraft mod .jar, and every Tabula .tbl model inside it is converted to .gltf automatically — packaged into one ZIP.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* ============================================================
+   Minecraft Mod Model Extractor — shared theme
+   Deep Navy / Royal Blue / Cyan glassmorphism SaaS theme
+   ============================================================ */
+
+:root{
+  --navy:        #081B33;
+  --navy-deep:   #051221;
+  --royal:       #1565FF;
+  --cyan:        #00D4FF;
+  --ink:         #EAF2FF;
+  --ink-dim:     #91A8C9;
+  --ink-faint:   #5B7398;
+  --ok:          #35E29B;
+  --warn:        #FFC65C;
+  --err:         #FF5C7A;
+
+  --glass:        rgba(255,255,255,0.045);
+  --glass-strong: rgba(255,255,255,0.08);
+  --glass-border: rgba(255,255,255,0.10);
+  --glow-cyan:    rgba(0,212,255,0.45);
+  --glow-royal:   rgba(21,101,255,0.45);
+
+  --r-xl: 28px;
+  --r-lg: 20px;
+  --r-md: 14px;
+  --r-sm: 9px;
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0; padding:0; scroll-behavior:smooth;}
+body{
+  background:
+    radial-gradient(ellipse 70% 45% at 15% -8%, rgba(21,101,255,0.20), transparent 60%),
+    radial-gradient(ellipse 65% 50% at 100% 10%, rgba(0,212,255,0.14), transparent 60%),
+    radial-gradient(ellipse 55% 40% at 90% 100%, rgba(21,101,255,0.10), transparent 60%),
+    var(--navy);
+  color: var(--ink);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ---------- floating particle canvas ---------- */
+#particles{
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+a{color: var(--cyan); text-decoration:none;}
+a:hover{text-decoration:underline;}
+
+/* ============================================================
+   NAV
+   ============================================================ */
+nav.topbar{
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+  padding: 14px 28px;
+  backdrop-filter: blur(18px) saturate(160%);
+  background: linear-gradient(180deg, rgba(5,18,33,0.92), rgba(5,18,33,0.6));
+  border-bottom: 1px solid var(--glass-border);
+}
+.brandmark{ display:flex; align-items:center; gap:11px; flex:none; }
+.brandmark .logo{
+  width: 36px; height: 36px; border-radius: 11px;
+  background: linear-gradient(135deg, var(--cyan), var(--royal));
+  display:flex; align-items:center; justify-content:center;
+  font-family: var(--font-display); font-weight:700; font-size:16px;
+  color: var(--navy-deep);
+  box-shadow: 0 0 22px var(--glow-cyan);
+}
+.brandmark .word{
+  font-family: var(--font-display); font-weight:600; font-size:15.5px;
+  letter-spacing:-0.01em; white-space:nowrap;
+}
+.brandmark .word span{color:var(--cyan);}
+.brandmark .word small{
+  display:block; font-family:var(--font-mono); font-size:10px;
+  color:var(--ink-faint); font-weight:400; letter-spacing:0.06em;
+}
+
+.nav-links{
+  display:flex; align-items:center; gap:22px;
+  font-family: var(--font-mono); font-size:12.5px; letter-spacing:0.03em;
+  color: var(--ink-dim);
+  flex:1; justify-content:center;
+}
+.nav-links a{ color: var(--ink-dim); position:relative; padding: 4px 0; transition:color .15s ease;}
+.nav-links a:hover{ color: var(--ink); text-decoration:none; }
+.nav-links a.active{ color: var(--cyan); }
+.nav-links a.active::after{
+  content:""; position:absolute; left:0; right:0; bottom:-6px; height:2px;
+  background: linear-gradient(90deg, var(--cyan), var(--royal));
+  border-radius:2px;
+  box-shadow: 0 0 8px var(--glow-cyan);
+}
+
+.kofi-btn{
+  display:flex; align-items:center; gap:6px; flex:none;
+  font-family: var(--font-mono); font-size:11.5px; font-weight:600; letter-spacing:0.03em;
+  color: var(--navy-deep);
+  background: linear-gradient(135deg, #FFC65C, #FF8A3D);
+  padding: 9px 15px;
+  border-radius: 100px;
+  white-space: nowrap;
+  box-shadow: 0 4px 18px -4px rgba(255,138,61,0.55);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.kofi-btn:hover{ transform: translateY(-1px); box-shadow: 0 6px 22px -4px rgba(255,138,61,0.7); text-decoration:none; }
+
+.nav-burger{ display:none; }
+
+@media (max-width: 860px){
+  .nav-links{ display:none; }
+  .nav-burger{ display:flex; }
+}
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+.wrap{
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 64px 24px 100px;
+  position: relative;
+  z-index: 1;
+}
+.wrap.narrow{ max-width: 760px; }
+
+.eyebrow{
+  display:flex; align-items:center; gap:10px;
+  font-family: var(--font-mono); font-size:12px; letter-spacing:0.14em;
+  text-transform:uppercase; color: var(--ink-faint);
+  margin-bottom:20px;
+}
+.eyebrow .dot{
+  width:7px; height:7px; border-radius:50%;
+  background: var(--cyan);
+  box-shadow: 0 0 0 4px var(--glow-cyan);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+h1.hero{
+  font-family: var(--font-display); font-weight:700;
+  font-size: clamp(34px, 5.4vw, 56px);
+  line-height:1.06; letter-spacing:-0.01em;
+  margin: 0 0 18px;
+}
+h1.hero .glow{
+  background: linear-gradient(135deg, var(--cyan), #8fe8ee 40%, var(--royal));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+p.lede{
+  font-size:16.5px; line-height:1.65; color: var(--ink-dim);
+  max-width:620px; margin: 0 0 40px;
+}
+p.lede b{ color: var(--ink); font-weight:600; }
+
+h2.page-title{
+  font-family: var(--font-display); font-weight:700;
+  font-size: clamp(28px, 4vw, 40px);
+  margin: 0 0 14px;
+}
+.section-label{
+  font-family: var(--font-mono); font-size:12px; letter-spacing:0.12em;
+  text-transform:uppercase; color: var(--ink-faint); margin-bottom:18px;
+}
+
+/* ============================================================
+   GLASS CARD
+   ============================================================ */
+.glass-card{
+  position:relative;
+  background: linear-gradient(180deg, var(--glass), rgba(255,255,255,0.015));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 24px 60px -30px rgba(0,0,0,0.6);
+  padding: 26px 26px;
+}
+.glass-card + .glass-card{ margin-top: 16px; }
+
+/* animated glowing border variant */
+.glow-border{ position:relative; border-radius: var(--r-lg); }
+.glow-border::before{
+  content:""; position:absolute; inset:-1px; border-radius: inherit;
+  background: linear-gradient(120deg, var(--cyan), var(--royal), var(--cyan));
+  background-size: 200% 200%;
+  z-index:-1;
+  opacity:0.55;
+  filter: blur(10px);
+  animation: borderflow 6s linear infinite;
+}
+@keyframes borderflow{
+  0%{ background-position: 0% 50%; }
+  100%{ background-position: 200% 50%; }
+}
+
+/* ============================================================
+   UPLOAD ZONE
+   ============================================================ */
+.upload-zone{
+  position:relative;
+  border-radius: var(--r-xl);
+  padding: 3px;
+  background: linear-gradient(120deg, rgba(0,212,255,0.5), rgba(21,101,255,0.3), rgba(0,212,255,0.5));
+  background-size: 200% 200%;
+  animation: borderflow 8s linear infinite;
+  box-shadow: 0 30px 70px -30px rgba(0,100,255,0.35);
+}
+.upload-zone .inner{
+  border-radius: calc(var(--r-xl) - 3px);
+  background: linear-gradient(180deg, rgba(8,27,51,0.96), rgba(5,18,33,0.98));
+  padding: 60px 30px;
+  text-align:center;
+  cursor:pointer;
+  transition: background .2s ease;
+}
+.upload-zone.drag .inner{ background: linear-gradient(180deg, rgba(0,212,255,0.10), rgba(5,18,33,0.98)); }
+
+.upload-icon{
+  width:64px; height:64px; margin: 0 auto 20px;
+  filter: drop-shadow(0 0 18px var(--glow-cyan));
+  animation: float 3.5s ease-in-out infinite;
+}
+@keyframes float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-8px); } }
+
+.upload-title{ font-family:var(--font-display); font-weight:600; font-size:20px; margin-bottom:8px; }
+.upload-sub{ font-family: var(--font-mono); font-size:12.5px; color: var(--ink-faint); }
+.upload-sub .accent{ color: var(--cyan); }
+input[type=file]{ display:none; }
+
+/* ---------- selected file card ---------- */
+.filecard{
+  display:none;
+  margin-top:18px;
+  align-items:center; justify-content:space-between; gap:14px;
+  flex-wrap:wrap;
+}
+.filecard.show{ display:flex; }
+.filecard .info{ display:flex; align-items:center; gap:12px; }
+.filecard .ficon{
+  width:40px; height:40px; border-radius:11px; flex:none;
+  background: linear-gradient(135deg, var(--royal), var(--cyan));
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-weight:700; font-size:11px; color:var(--navy-deep);
+}
+.filecard .name{ font-weight:600; font-size:14px; color:var(--ink); word-break:break-all; }
+.filecard .size{ font-family:var(--font-mono); font-size:12px; color:var(--ink-faint); }
+.filecard .status-pill{
+  font-family:var(--font-mono); font-size:11px; padding:5px 12px; border-radius:100px;
+  border:1px solid var(--glass-border); background:var(--glass); color:var(--ink-dim); white-space:nowrap;
+}
+.status-pill.ok{ color:var(--ok); border-color: rgba(53,226,155,0.3); }
+.status-pill.err{ color:var(--err); border-color: rgba(255,92,122,0.3); }
+.status-pill.busy{ color:var(--cyan); border-color: rgba(0,212,255,0.3); }
+
+/* ============================================================
+   PROGRESS
+   ============================================================ */
+.progress-block{ margin-top: 20px; }
+.progress-row{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+.progress-row .label{ font-family:var(--font-mono); font-size:12px; color:var(--ink-dim); }
+.progress-row .value{ font-family:var(--font-mono); font-size:12px; color:var(--cyan); }
+.progress-track{
+  height:8px; border-radius:100px; background: rgba(255,255,255,0.06);
+  overflow:hidden; border:1px solid var(--glass-border);
+}
+.progress-fill{
+  height:100%; border-radius:100px;
+  background: linear-gradient(90deg, var(--royal), var(--cyan));
+  box-shadow: 0 0 14px var(--glow-cyan);
+  width:0%;
+  transition: width .25s ease;
+  position:relative;
+  overflow:hidden;
+}
+.progress-fill::after{
+  content:""; position:absolute; inset:0;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent);
+  width:40%;
+  animation: shine 1.6s linear infinite;
+}
+@keyframes shine{ 0%{ transform:translateX(-120%); } 100%{ transform:translateX(320%); } }
+
+/* ---------- discovered model list ---------- */
+.model-list{
+  margin-top:20px;
+  max-height: 360px;
+  overflow-y:auto;
+  border-radius: var(--r-md);
+  border:1px solid var(--glass-border);
+}
+.model-list::-webkit-scrollbar{ width:8px; }
+.model-list::-webkit-scrollbar-thumb{ background: var(--glass-strong); border-radius:100px; }
+.model-row{
+  display:flex; align-items:center; gap:12px;
+  padding:11px 16px;
+  font-family: var(--font-mono); font-size:12.5px;
+  border-bottom:1px solid var(--glass-border);
+  animation: rowIn .3s ease forwards;
+  opacity:0; transform: translateY(4px);
+}
+.model-row:last-child{ border-bottom:none; }
+@keyframes rowIn{ to{ opacity:1; transform:translateY(0); } }
+.model-row .path{ flex:1; color: var(--ink-dim); word-break:break-all; }
+.model-row .path b{ color:var(--ink); font-weight:600; }
+.model-row .dot{ width:7px; height:7px; border-radius:50%; flex:none; }
+.model-row .dot.pending{ background: var(--ink-faint); }
+.model-row .dot.busy{ background: var(--cyan); box-shadow:0 0 8px var(--glow-cyan); animation: pulse 1s ease-in-out infinite; }
+.model-row .dot.ok{ background: var(--ok); box-shadow:0 0 8px rgba(53,226,155,0.5); }
+.model-row .dot.err{ background: var(--err); box-shadow:0 0 8px rgba(255,92,122,0.5); }
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn{
+  position:relative;
+  font-family: var(--font-display); font-weight:600; font-size:14.5px;
+  border:none; border-radius: var(--r-sm);
+  padding: 14px 26px;
+  cursor:pointer;
+  overflow:hidden;
+  transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+  display:inline-flex; align-items:center; gap:9px;
+}
+.btn:disabled{ opacity:0.35; cursor:not-allowed; }
+.btn .ripple{
+  position:absolute; border-radius:50%; background:rgba(255,255,255,0.5);
+  transform:scale(0); opacity:0.6; pointer-events:none;
+  animation: rippleAnim .55s ease-out forwards;
+}
+@keyframes rippleAnim{ to{ transform:scale(3.2); opacity:0; } }
+
+.btn-primary{
+  color:#04101f;
+  background: linear-gradient(135deg, var(--cyan), var(--royal));
+  box-shadow: 0 0 0 1px rgba(0,212,255,0.4) inset, 0 10px 30px -8px var(--glow-royal), 0 0 24px -4px var(--glow-cyan);
+}
+.btn-primary:hover:not(:disabled){ transform: translateY(-2px); box-shadow: 0 0 0 1px rgba(0,212,255,0.6) inset, 0 14px 36px -6px var(--glow-royal), 0 0 34px -2px var(--glow-cyan); }
+
+.btn-ghost{
+  color: var(--ink-dim);
+  background: var(--glass);
+  border:1px solid var(--glass-border);
+}
+.btn-ghost:hover:not(:disabled){ color:var(--ink); border-color: var(--cyan); box-shadow: 0 0 18px -6px var(--glow-cyan); }
+
+.actions{ margin-top:26px; display:flex; gap:14px; flex-wrap:wrap; }
+
+/* ============================================================
+   STAT PILLS / GRID
+   ============================================================ */
+.stat-grid{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:14px;
+  margin-top:26px;
+}
+.stat-card{
+  background: var(--glass); border:1px solid var(--glass-border); border-radius: var(--r-md);
+  padding:18px; text-align:center;
+  transition: transform .2s ease, border-color .2s ease;
+}
+.stat-card:hover{ transform:translateY(-2px); border-color: rgba(0,212,255,0.35); }
+.stat-card .num{
+  font-family: var(--font-display); font-weight:700; font-size:26px;
+  background: linear-gradient(135deg, var(--cyan), var(--royal));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.stat-card .lbl{ font-family: var(--font-mono); font-size:11px; color: var(--ink-faint); margin-top:4px; text-transform:uppercase; letter-spacing:0.06em; }
+
+/* ============================================================
+   PROCESS STEPS / FEATURE GRID
+   ============================================================ */
+.steps{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.step{
+  background: var(--glass); border:1px solid var(--glass-border); border-radius: var(--r-md);
+  padding:22px 18px;
+  transition: transform .2s ease, border-color .2s ease;
+}
+.step:hover{ transform: translateY(-3px); border-color: rgba(0,212,255,0.35); box-shadow: 0 12px 30px -14px var(--glow-cyan); }
+.step .num{ font-family: var(--font-mono); color:var(--cyan); font-size:12px; margin-bottom:10px; }
+.step h3{ font-family: var(--font-display); font-size:15px; margin:0 0 8px; }
+.step p{ font-size:13px; color:var(--ink-dim); line-height:1.55; margin:0; }
+
+/* ============================================================
+   FAQ ACCORDION
+   ============================================================ */
+.faq-item{
+  border:1px solid var(--glass-border); border-radius: var(--r-md);
+  background:var(--glass); margin-bottom:10px; overflow:hidden;
+}
+.faq-q{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:18px 20px; cursor:pointer; font-weight:600; font-size:14.5px;
+}
+.faq-q .chev{ transition: transform .25s ease; color: var(--cyan); flex:none; }
+.faq-item.open .faq-q .chev{ transform: rotate(180deg); }
+.faq-a{
+  max-height:0; overflow:hidden; transition: max-height .3s ease;
+  padding: 0 20px;
+  font-size:13.5px; color: var(--ink-dim); line-height:1.65;
+}
+.faq-item.open .faq-a{ padding: 0 20px 18px; }
+
+/* ============================================================
+   TOASTS
+   ============================================================ */
+#toast-stack{
+  position: fixed; bottom: 24px; right: 24px; z-index: 100;
+  display:flex; flex-direction:column; gap:10px;
+  max-width: 340px;
+}
+.toast{
+  display:flex; align-items:flex-start; gap:10px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, rgba(8,27,51,0.96), rgba(5,18,33,0.98));
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 20px 50px -20px rgba(0,0,0,0.7);
+  font-size: 13px; line-height:1.5;
+  animation: toastIn .3s ease forwards;
+}
+@keyframes toastIn{ from{ opacity:0; transform: translateX(20px); } to{ opacity:1; transform:translateX(0); } }
+.toast.ok{ border-color: rgba(53,226,155,0.35); }
+.toast.err{ border-color: rgba(255,92,122,0.35); }
+.toast .dot{ width:8px; height:8px; border-radius:50%; margin-top:4px; flex:none; }
+.toast.ok .dot{ background: var(--ok); box-shadow:0 0 8px rgba(53,226,155,0.6); }
+.toast.err .dot{ background: var(--err); box-shadow:0 0 8px rgba(255,92,122,0.6); }
+.toast.info .dot{ background: var(--cyan); box-shadow:0 0 8px var(--glow-cyan); }
+
+/* ============================================================
+   SPINNER
+   ============================================================ */
+.spinner{
+  width:18px; height:18px; border-radius:50%;
+  border: 2.5px solid rgba(0,212,255,0.2);
+  border-top-color: var(--cyan);
+  animation: spin .7s linear infinite;
+  box-shadow: 0 0 10px var(--glow-cyan);
+  flex:none;
+}
+@keyframes spin{ to{ transform: rotate(360deg); } }
+
+/* ============================================================
+   SUPPORT BANNER + FOOTER
+   ============================================================ */
+.support-banner{
+  margin-top:90px; padding:32px 30px; border-radius: var(--r-xl);
+  border:1px solid rgba(255,198,92,0.25);
+  background: linear-gradient(135deg, rgba(255,198,92,0.10), rgba(255,138,61,0.05));
+  display:flex; align-items:center; justify-content:space-between; gap:22px; flex-wrap:wrap;
+}
+.support-banner h3{ font-family: var(--font-display); font-size:19px; margin:0 0 6px; }
+.support-banner p{ font-size:13.5px; color: var(--ink-dim); margin:0; max-width:440px; line-height:1.55; }
+
+footer.site-footer{
+  margin-top:56px; padding: 34px 26px 40px;
+  border-top: 1px solid var(--glass-border);
+  text-align:center;
+}
+footer.site-footer .credit{
+  font-family: var(--font-display); font-weight:700; font-size:15px; color: var(--ink);
+}
+footer.site-footer .credit span{ color: var(--cyan); }
+footer.site-footer .support-line{
+  margin-top:10px; font-family: var(--font-mono); font-size:12px; color: var(--ink-faint);
+}
+footer.site-footer .support-line a{ color: var(--cyan); }
+footer.site-footer .kofi-btn{ margin-top:16px; display:inline-flex; }
+footer.site-footer .foot-links{
+  margin-top:22px; display:flex; gap:18px; justify-content:center; flex-wrap:wrap;
+  font-family: var(--font-mono); font-size:11.5px; color: var(--ink-faint);
+}
+
+/* ============================================================
+   MISC PAGE ELEMENTS (docs / faq / changelog / privacy)
+   ============================================================ */
+.doc-block{ margin-bottom:38px; }
+.doc-block h3{ font-family: var(--font-display); font-size:19px; margin:0 0 10px; }
+.doc-block p, .doc-block li{ font-size:14.5px; line-height:1.7; color: var(--ink-dim); }
+.doc-block code{
+  font-family: var(--font-mono); font-size:12.5px; color: var(--cyan);
+  background: rgba(0,212,255,0.08); padding:2px 7px; border-radius:6px;
+}
+.doc-block pre{
+  background: rgba(0,0,0,0.3); border:1px solid var(--glass-border); border-radius: var(--r-md);
+  padding:16px 18px; overflow-x:auto; font-family: var(--font-mono); font-size:12.5px; color: var(--ink-dim);
+}
+.changelog-entry{ display:flex; gap:18px; margin-bottom:26px; }
+.changelog-entry .tag{
+  font-family: var(--font-mono); font-size:11px; color: var(--navy-deep);
+  background: linear-gradient(135deg, var(--cyan), var(--royal));
+  padding:4px 10px; border-radius:100px; height:fit-content; white-space:nowrap;
+}
+.changelog-entry .content h4{ margin:0 0 6px; font-family:var(--font-display); font-size:15px; }
+.changelog-entry .content p{ margin:0; font-size:13.5px; color:var(--ink-dim); line-height:1.6; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 780px){
+  .steps{ grid-template-columns:1fr 1fr; }
+  .stat-grid{ grid-template-columns:1fr; }
+  .support-banner{ flex-direction:column; align-items:flex-start; }
+}
+@media (max-width: 480px){
+  .steps{ grid-template-columns:1fr; }
+  .upload-zone .inner{ padding:44px 18px; }
+  nav.topbar{ padding:12px 16px; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* fade-in utility for page sections */
+.fade-in{ animation: fadeIn .6s ease forwards; }
+@keyframes fadeIn{ from{ opacity:0; transform: translateY(10px); } to{ opacity:1; transform:translateY(0); } }
+
+
+/* ---------- single-file SPA page toggling ---------- */
+.page-section{ display:none; }
+.page-section.active{ display:block; }
+
+</style>
+</head>
+<body>
+<canvas id="particles"></canvas>
+
+<nav class="topbar">
+  <div class="brandmark">
+    <div class="logo">M</div>
+    <div class="word">Minecraft Mod<span> </span>Model Extractor<small>.jar → .gltf, in bulk</small></div>
+  </div>
+  <div class="nav-links">
+    <a href="#home" data-page="home" class="active">Home</a>
+    <a href="#documentation" data-page="documentation">Documentation</a>
+    <a href="#faq" data-page="faq">FAQ</a>
+    <a href="#changelog" data-page="changelog">Changelog</a>
+    <a href="#privacy" data-page="privacy">Privacy</a>
+  </div>
+  <a class="kofi-btn" href="https://ko-fi.com/ruhansh" target="_blank" rel="noopener">☕ Support on Ko-fi</a>
+</nav>
+
+<div class="wrap page-section" id="page-home">
+<div class="eyebrow fade-in"><span class="dot"></span> BULK MOD MODEL CONVERSION</div>
+  <h1 class="hero fade-in">Every <span class="glow">.tbl</span> in your mod,<br>converted to <span class="glow">.gltf</span> at once.</h1>
+  <p class="lede fade-in">
+    Drop in a Minecraft mod <b>.jar</b>. This extracts the whole archive, recursively scans
+    every folder for Tabula <b>.tbl</b> models, converts each one to glTF 2.0, and hands you back
+    a single ZIP with the original folder structure preserved — entirely in your browser.
+  </p>
+
+  <div class="upload-zone glow-border fade-in" id="dropzoneOuter">
+    <div class="inner" id="dropzone">
+      <svg class="upload-icon" viewBox="0 0 64 64" fill="none">
+        <path d="M32 8 L52 20 V44 L32 56 L12 44 V20 Z" stroke="#00D4FF" stroke-width="2"/>
+        <path d="M32 8 V32 M32 32 L52 20 M32 32 L12 20 M32 32 V56" stroke="#00D4FF" stroke-width="1.4" opacity="0.5"/>
+        <path d="M24 30 L32 38 L44 24" stroke="#1565FF" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="upload-title">Drop your mod .jar here, or click to browse</div>
+      <div class="upload-sub">accepts <span class="accent">.jar</span> — every .tbl inside is found automatically</div>
+      <input type="file" id="fileInput" accept=".jar">
+    </div>
+  </div>
+
+  <div class="filecard" id="filecard">
+    <div class="info">
+      <div class="ficon">JAR</div>
+      <div>
+        <div class="name" id="fc-name"></div>
+        <div class="size" id="fc-size"></div>
+      </div>
+    </div>
+    <div class="status-pill" id="fc-status">ready</div>
+  </div>
+
+  <div class="progress-block" id="progressBlock" style="display:none;">
+    <div class="progress-row">
+      <span class="label" id="progressLabel">Waiting…</span>
+      <span class="value" id="progressValue"></span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+  <div class="stat-grid" id="statGrid" style="display:none;">
+    <div class="stat-card"><div class="num" id="statDiscovered">0</div><div class="lbl">Models found</div></div>
+    <div class="stat-card"><div class="num" id="statConverted">0</div><div class="lbl">Converted</div></div>
+    <div class="stat-card" style="display:none;"><div class="num" id="statErrors">0</div><div class="lbl">Failed</div></div>
+  </div>
+
+  <div class="model-list" id="modelList" style="display:none;"></div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="convertBtn" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Extract &amp; Convert
+    </button>
+    <button class="btn btn-ghost" id="downloadBtn" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Download ZIP
+    </button>
+  </div>
+
+  <div class="process" style="margin-top:88px;">
+    <div class="section-label">How it works</div>
+    <div class="steps">
+      <div class="step">
+        <div class="num">01</div>
+        <h3>Unpack the .jar</h3>
+        <p>The mod archive is extracted fully in-browser — nothing is uploaded to a server.</p>
+      </div>
+      <div class="step">
+        <div class="num">02</div>
+        <h3>Recursive scan</h3>
+        <p>Every folder, at every depth, is searched for files ending in .tbl.</p>
+      </div>
+      <div class="step">
+        <div class="num">03</div>
+        <h3>Convert each model</h3>
+        <p>Every cuboid tree is rebuilt as glTF geometry with correct UVs, pivots, and hierarchy.</p>
+      </div>
+      <div class="step">
+        <div class="num">04</div>
+        <h3>Bundle the ZIP</h3>
+        <p>All .gltf files are packaged into one ZIP, mirroring the mod's original folder layout.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="support-banner fade-in">
+    <div>
+      <h3>Find this useful?</h3>
+      <p>This tool is free, runs entirely in your browser, and always will be. If it saved you time, a coffee is always appreciated.</p>
+    </div>
+    <a class="btn btn-primary kofi-btn" href="https://ko-fi.com/ruhansh" target="_blank" rel="noopener">☕ Support on Ko-fi</a>
+  </div>
+</div>
+
+<div class="wrap narrow page-section" id="page-documentation">
+<div class="eyebrow"><span class="dot"></span> DOCUMENTATION</div>
+  <h2 class="page-title">How the extractor works</h2>
+  <p class="lede">A technical walkthrough of the pipeline, the file formats involved, and what to expect from the output.</p>
+
+  <div class="doc-block">
+    <h3>1. What counts as a valid input</h3>
+    <p>Upload any Minecraft mod packaged as a <code>.jar</code> file. A <code>.jar</code> is just a
+    ZIP archive under the hood, so the extractor opens it the same way a ZIP tool would — no
+    Minecraft installation or Java runtime is needed.</p>
+  </div>
+
+  <div class="doc-block">
+    <h3>2. Recursive .tbl discovery</h3>
+    <p>Once the archive is open, every entry in it — regardless of how deeply nested its folder
+    is — is checked against the <code>.tbl</code> extension. This means models buried in paths like
+    <code>assets/mymod/models/entity/sub/part.tbl</code> are found exactly the same as ones sitting
+    at the root.</p>
+  </div>
+
+  <div class="doc-block">
+    <h3>3. What a .tbl file actually contains</h3>
+    <p>A Tabula <code>.tbl</code> file is itself a small ZIP archive containing:</p>
+    <ul>
+      <li><code>model.json</code> — the cuboid hierarchy: every box's position, rotation, dimensions, and texture offset</li>
+      <li>a texture image (usually <code>.png</code>) — the skin applied to the model</li>
+    </ul>
+    <p>The extractor opens this inner archive for every discovered <code>.tbl</code>, independently of the others.</p>
+  </div>
+
+  <div class="doc-block">
+    <h3>4. The conversion itself</h3>
+    <p>Each cuboid becomes a glTF node with its own mesh: 24 vertices (4 per face), correct face
+    normals, and UV coordinates computed from the same cross-unwrap layout Tabula/Techne and
+    Minecraft itself use. Parent/child relationships in the cuboid tree become the glTF node
+    hierarchy, so pivots and rotations stay intact.</p>
+    <pre>model.json (cuboid tree)
+  └─ BodyUpper
+       ├─ BodyLower
+       ├─ Wing_L
+       └─ Wing_R
+            └─ WingTip_R
+
+→ becomes a glTF node tree with the same structure,
+  each node carrying its own translation / rotation / mesh.</pre>
+  </div>
+
+  <div class="doc-block">
+    <h3>5. Output structure</h3>
+    <p>Every successfully converted model is written into an output ZIP at the <b>same relative
+    path</b> it had inside the original mod, with only the extension changed:</p>
+    <pre>assets/dragonmod/models/dragon.tbl   →  assets/dragonmod/models/dragon.gltf
+assets/dragonmod/models/sub/wings.tbl →  assets/dragonmod/models/sub/wings.gltf</pre>
+    <p>This means the folder hierarchy of the original mod is preserved exactly in the output ZIP.</p>
+  </div>
+
+  <div class="doc-block">
+    <h3>6. Error handling</h3>
+    <p>If a particular <code>.tbl</code> is corrupted, empty, or not actually a valid archive, that
+    one file is marked as failed and skipped — the rest of the mod continues converting normally.
+    You'll see exactly which files failed, and why, in the results list.</p>
+  </div>
+
+  <div class="doc-block">
+    <h3>7. Performance &amp; memory</h3>
+    <p>Models are converted one at a time rather than all at once, so memory usage stays flat
+    even on mods containing hundreds of models — nothing is held in memory longer than the single
+    file currently being processed.</p>
+  </div>
+
+  <div class="doc-block">
+    <h3>8. Privacy</h3>
+    <p>Everything — extraction, conversion, and packaging — happens locally in your browser tab.
+    Your mod file is never uploaded anywhere. See the <a href="#privacy" data-page="privacy">Privacy Policy</a> for details.</p>
+  </div>
+</div>
+
+<div class="wrap narrow page-section" id="page-faq">
+<div class="eyebrow"><span class="dot"></span> FAQ</div>
+  <h2 class="page-title">Frequently asked questions</h2>
+  <p class="lede">Common questions about the extractor, the formats it supports, and its limits.</p>
+
+  <div class="faq-item open">
+    <div class="faq-q">Does my mod file get uploaded anywhere?<span class="chev">▾</span></div>
+    <div class="faq-a" style="max-height:200px;">No. Everything runs client-side in your browser — extraction, model conversion, and ZIP
+      packaging never leave your device. There is no server component.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">What model formats are supported as input?<span class="chev">▾</span></div>
+    <div class="faq-a">Only Tabula <code>.tbl</code> files, found anywhere inside the uploaded <code>.jar</code>. Other
+      model formats (Bedrock geometry JSON, OptiFine JPM/JEM, Blockbench-native projects that
+      aren't <code>.tbl</code>-based) aren't scanned for — only genuine Tabula/Techne-style <code>.tbl</code>
+      archives are recognized.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">Why did some models fail to convert?<span class="chev">▾</span></div>
+    <div class="faq-a">Usually because the <code>.tbl</code> file is corrupted, empty, or doesn't actually contain a
+      <code>model.json</code> inside it. The results list shows exactly which files failed and why —
+      every other model in the mod still converts normally.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">Will textures be included in the output?<span class="chev">▾</span></div>
+    <div class="faq-a">Yes, when the original <code>.tbl</code> includes one. The texture is embedded directly inside
+      each <code>.gltf</code> file as base64 data, so every converted model is a single self-contained
+      file — no separate texture files to manage.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">Does the output preserve the mod's folder structure?<span class="chev">▾</span></div>
+    <div class="faq-a">Yes. Each converted model is written into the output ZIP at the same relative path the
+      original <code>.tbl</code> had — only the file extension changes.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">How large a mod can this handle?<span class="chev">▾</span></div>
+    <div class="faq-a">Models are converted one at a time rather than all simultaneously, which keeps memory
+      usage flat regardless of how many models a mod contains. Extremely large mods (hundreds of
+      MB, thousands of models) will simply take longer, limited mainly by your device and browser.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">Can I use the converted .gltf files commercially?<span class="chev">▾</span></div>
+    <div class="faq-a">The conversion itself doesn't grant you any rights to a mod's assets — that depends
+      entirely on the original mod's license. This tool only changes the file format; it doesn't
+      change who owns the content.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">Why glTF specifically?<span class="chev">▾</span></div>
+    <div class="faq-a">glTF 2.0 is the most widely supported modern 3D interchange format — it opens directly
+      in Blender, three.js, Babylon.js, most game engines, and countless online viewers, without
+      needing any Minecraft-specific tooling.</div>
+  </div>
+</div>
+
+<div class="wrap narrow page-section" id="page-changelog">
+<div class="eyebrow"><span class="dot"></span> CHANGELOG</div>
+  <h2 class="page-title">Version history</h2>
+  <p class="lede">What's changed, release by release.</p>
+
+  <div class="changelog-entry">
+    <div class="tag">v3.0</div>
+    <div class="content">
+      <h4>Minecraft Mod Model Extractor</h4>
+      <p>Rebuilt around bulk <code>.jar</code> processing: recursively scans an entire mod archive for
+      <code>.tbl</code> models, converts every one automatically, and packages the results into a
+      single downloadable ZIP with the original folder structure preserved. New premium
+      glassmorphism interface with live per-model progress, discovered-model list, and graceful
+      per-file error handling.</p>
+    </div>
+  </div>
+
+  <div class="changelog-entry">
+    <div class="tag">v2.0</div>
+    <div class="content">
+      <h4>Multi-format export</h4>
+      <p>Added GLB, Wavefront OBJ (bundled with its .mtl and texture), and native Blockbench
+      <code>.bbmodel</code> export alongside glTF, all sharing the same underlying conversion engine.
+      Introduced a format selector and a full visual redesign.</p>
+    </div>
+  </div>
+
+  <div class="changelog-entry">
+    <div class="tag">v1.0</div>
+    <div class="content">
+      <h4>Initial release</h4>
+      <p>First version of the single-file <code>.tbl → .gltf</code> browser converter: unzips a Tabula
+      model, rebuilds cuboid geometry with the correct Minecraft box-UV unwrap, and exports a
+      self-contained glTF file.</p>
+    </div>
+  </div>
+</div>
+
+<div class="wrap narrow page-section" id="page-privacy">
+<div class="eyebrow"><span class="dot"></span> PRIVACY POLICY</div>
+  <h2 class="page-title">Your files never leave your browser</h2>
+  <p class="lede">Last updated 2026. This tool was built to be private by construction, not by policy.</p>
+
+  <div class="doc-block">
+    <h3>No uploads, no server</h3>
+    <p>This application has no backend. There is no server that receives, stores, or processes
+    your <code>.jar</code> file. Every step — reading the archive, scanning for models, converting
+    them, and building the output ZIP — runs entirely inside your own browser tab using
+    JavaScript.</p>
+  </div>
+
+  <div class="doc-block">
+    <h3>What we don't collect</h3>
+    <ul>
+      <li>We don't collect, log, or transmit the contents of any file you upload.</li>
+      <li>We don't store filenames, model data, or textures anywhere.</li>
+      <li>We don't use analytics or tracking scripts on this site.</li>
+      <li>We don't use cookies for tracking purposes.</li>
+    </ul>
+  </div>
+
+  <div class="doc-block">
+    <h3>Third-party resources</h3>
+    <p>The page loads two external resources over HTTPS: Google Fonts (for typography) and the
+    JSZip library from a public CDN (for reading and writing ZIP/JAR archives). Neither receives
+    your uploaded files — they are static assets loaded once when the page opens.</p>
+  </div>
+
+  <div class="doc-block">
+    <h3>Ko-fi links</h3>
+    <p>Support links on this site point to <a href="https://ko-fi.com/ruhansh" target="_blank" rel="noopener">ko-fi.com/ruhansh</a>,
+    an external, independently operated donation platform. Visiting that link is subject to
+    Ko-fi's own privacy policy, not this one.</p>
+  </div>
+
+  <div class="doc-block">
+    <h3>Changes to this policy</h3>
+    <p>If this tool ever changes to include a server-side component, this page will be updated
+    to reflect that clearly before such a change ships.</p>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="credit">Designed and developed by <span>RUHANShFx</span></div>
+  <div class="support-line">Support this project: <a href="https://ko-fi.com/ruhansh" target="_blank" rel="noopener">ko-fi.com/ruhansh</a></div>
+  <a class="kofi-btn" href="https://ko-fi.com/ruhansh" target="_blank" rel="noopener">☕ Support on Ko-fi</a>
+  <div class="foot-links">
+    <a href="#documentation" data-page="documentation">Documentation</a>
+    <a href="#faq" data-page="faq">FAQ</a>
+    <a href="#changelog" data-page="changelog">Changelog</a>
+    <a href="#privacy" data-page="privacy">Privacy Policy</a>
+  </div>
+</footer>
+
+<div id="toast-stack"></div>
+
+<script>
+/* ============================================================
+   Floating particle background — lightweight canvas animation
+   ============================================================ */
+(function(){
+  const canvas = document.getElementById('particles');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  let w, h;
+
+  function resize(){
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const COUNT = Math.min(60, Math.floor((window.innerWidth * window.innerHeight) / 22000));
+  for (let i = 0; i < COUNT; i++){
+    particles.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: 0.6 + Math.random() * 2.2,
+      vy: -(0.15 + Math.random() * 0.35),
+      vx: (Math.random() - 0.5) * 0.15,
+      a: 0.15 + Math.random() * 0.5,
+      hue: Math.random() > 0.5 ? '0,212,255' : '21,101,255'
+    });
+  }
+
+  function tick(){
+    ctx.clearRect(0, 0, w, h);
+    for (const p of particles){
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.y < -10){ p.y = h + 10; p.x = Math.random() * w; }
+      if (p.x < -10) p.x = w + 10;
+      if (p.x > w + 10) p.x = -10;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.hue},${p.a})`;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = `rgba(${p.hue},0.8)`;
+      ctx.fill();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    tick();
+  }
+})();
+
+</script>
+<script>
+/* ============================================================
+   TblConverter — Tabula/Techne cuboid model → glTF 2.0 engine
+   This is the same tested conversion engine used by tbl2gltf.
+   Pure functions only: no DOM access, safe to reuse anywhere.
+   ============================================================ */
+const TblConverter = (function(){
+
+  const WORLD_SCALE = 1/16; // Minecraft "pixel" units -> meter-ish scale
+
+  function deg2rad(d){ return d * Math.PI / 180; }
+
+  // ---------- quaternion (glTF node hierarchy rotation) ----------
+  function eulerXYZtoQuat(rx, ry, rz){
+    rx = deg2rad(rx); ry = deg2rad(ry); rz = deg2rad(rz);
+    const cx = Math.cos(rx/2), sx = Math.sin(rx/2);
+    const cy = Math.cos(ry/2), sy = Math.sin(ry/2);
+    const cz = Math.cos(rz/2), sz = Math.sin(rz/2);
+    const qx = [sx,0,0,cx], qy=[0,sy,0,cy], qz=[0,0,sz,cz];
+    function qmul(a,b){
+      const [ax,ay,az,aw]=a, [bx,by,bz,bw]=b;
+      return [
+        aw*bx + ax*bw + ay*bz - az*by,
+        aw*by - ax*bz + ay*bw + az*bx,
+        aw*bz + ax*by - ay*bx + az*bw,
+        aw*bw - ax*bx - ay*by - az*bz
+      ];
+    }
+    return qmul(qz, qmul(qy, qx)); // apply X first, then Y, then Z
+  }
+
+  // ---------- Minecraft/Tabula box-UV cross unwrap ----------
+  function boxUVRects(u, v, w, h, d){
+    const r = (u0,v0,uw,vh) => ({x1:u0, y1:v0, x2:u0+uw, y2:v0+vh});
+    return {
+      up:    r(u+d,     v,     w, d),
+      down:  r(u+d+w,   v,     w, d),
+      east:  r(u,       v+d,   d, h),   // +X
+      south: r(u+d,     v+d,   w, h),   // +Z (front)
+      west:  r(u+d+w,   v+d,   d, h),   // -X
+      north: r(u+2*d+w, v+d,   w, h),   // -Z (back)
+    };
+  }
+
+  function boxCorners(dim, offset){
+    const [w,h,d] = dim;
+    const [x0,y0,z0] = offset;
+    const x1=x0+w, y1=y0+h, z1=z0+d;
+    return {
+      c000:[x0,y0,z0], c100:[x1,y0,z0], c010:[x0,y1,z0], c110:[x1,y1,z0],
+      c001:[x0,y0,z1], c101:[x1,y0,z1], c011:[x0,y1,z1], c111:[x1,y1,z1],
+    };
+  }
+
+  function boxFaces(c){
+    return [
+      [[c.c100,c.c110,c.c111,c.c101], [1,0,0], 'east'],
+      [[c.c001,c.c011,c.c010,c.c000], [-1,0,0], 'west'],
+      [[c.c010,c.c011,c.c111,c.c110], [0,1,0], 'up'],
+      [[c.c000,c.c100,c.c101,c.c001], [0,-1,0], 'down'],
+      [[c.c101,c.c111,c.c011,c.c001], [0,0,1], 'south'],
+      [[c.c100,c.c000,c.c010,c.c110], [0,0,-1], 'north'],
+    ];
+  }
+
+  function countCubes(model){
+    let n = 0;
+    function rec(c){ n++; (c.children||[]).forEach(rec); }
+    (model.cubes || []).forEach(rec);
+    return n;
+  }
+
+  function arrayBufferToBase64(buffer){
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const chunk = 0x8000;
+    for (let i=0; i<bytes.length; i+=chunk){
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+    }
+    return btoa(binary);
+  }
+
+  // ---------- build node/mesh hierarchy from the cuboid tree ----------
+  function buildGltfCommon(model, TW, TH){
+    const allPositions=[], allNormals=[], allUVs=[], allIndices=[];
+    const nodes=[], meshes=[];
+
+    function buildBoxGeometry(dim, offset, txOffset, mirror){
+      const [u,v] = txOffset;
+      const [w,h,d] = dim;
+      const rects = boxUVRects(u, v, w, h, d);
+      const corners = boxCorners(dim, offset);
+      const faces = boxFaces(corners);
+      const positions=[], normals=[], uvs=[], indices=[];
+      for (const [corners0, normal, dir] of faces){
+        let quad = corners0;
+        const rect = rects[dir];
+        let uvQuad = [
+          [rect.x1/TW, rect.y1/TH],[rect.x1/TW, rect.y2/TH],
+          [rect.x2/TW, rect.y2/TH],[rect.x2/TW, rect.y1/TH],
+        ];
+        if (mirror) quad = [quad[0], quad[3], quad[2], quad[1]];
+        const base = positions.length;
+        for (const p of quad){
+          positions.push([p[0]*WORLD_SCALE, p[1]*WORLD_SCALE, p[2]*WORLD_SCALE]);
+          normals.push(normal);
+        }
+        for (const t of uvQuad) uvs.push(t);
+        indices.push(base, base+1, base+2, base, base+2, base+3);
+      }
+      return {positions, normals, uvs, indices};
+    }
+
+    function addCubeNode(cube){
+      const {positions, normals, uvs, indices} = buildBoxGeometry(
+        cube.dimensions, cube.offset, cube.txOffset, !!cube.txMirror
+      );
+      const vstart = allPositions.length;
+      const istart = allIndices.length;
+      for (const p of positions) allPositions.push(p);
+      for (const n of normals) allNormals.push(n);
+      for (const t of uvs) allUVs.push(t);
+      for (const i of indices) allIndices.push(i);
+
+      const meshIndex = meshes.length;
+      meshes.push({vertexStart: vstart, vertexCount: positions.length, indexStart: istart, indexCount: indices.length});
+
+      const rot = cube.rotation || [0,0,0];
+      const pos = cube.position;
+      const [qx,qy,qz,qw] = eulerXYZtoQuat(rot[0], rot[1], rot[2]);
+      const node = {
+        name: cube.name,
+        translation: [pos[0]*WORLD_SCALE, pos[1]*WORLD_SCALE, pos[2]*WORLD_SCALE],
+        rotation: [qx,qy,qz,qw],
+        scale: cube.scale || [1,1,1],
+        mesh: meshIndex,
+        children: []
+      };
+      const nodeIndex = nodes.length;
+      nodes.push(node);
+      for (const child of (cube.children || [])){
+        node.children.push(addCubeNode(child));
+      }
+      return nodeIndex;
+    }
+
+    const rootIndices = (model.cubes || []).map(c => addCubeNode(c));
+    return {allPositions, allNormals, allUVs, allIndices, nodes, meshes, rootIndices};
+  }
+
+  function packBuffer(allPositions, allNormals, allUVs, allIndices){
+    function align4(arr){ while (arr.length % 4 !== 0) arr.push(0); }
+
+    const posBytes = [];
+    for (const p of allPositions) for (const b of new Uint8Array(new Float32Array(p).buffer)) posBytes.push(b);
+    align4(posBytes);
+    const normBytes = [];
+    for (const n of allNormals) for (const b of new Uint8Array(new Float32Array(n).buffer)) normBytes.push(b);
+    align4(normBytes);
+    const uvBytes = [];
+    for (const t of allUVs) for (const b of new Uint8Array(new Float32Array(t).buffer)) uvBytes.push(b);
+    align4(uvBytes);
+    const idxBytes = [];
+    for (const i of allIndices) for (const b of new Uint8Array(new Uint32Array([i]).buffer)) idxBytes.push(b);
+    align4(idxBytes);
+
+    const posOffset = 0;
+    const normOffset = posBytes.length;
+    const uvOffset = normOffset + normBytes.length;
+    const idxOffset = uvOffset + uvBytes.length;
+
+    const total = new Uint8Array(idxOffset + idxBytes.length);
+    total.set(posBytes, posOffset);
+    total.set(normBytes, normOffset);
+    total.set(uvBytes, uvOffset);
+    total.set(idxBytes, idxOffset);
+
+    return {bytes: total, posOffset, normOffset, uvOffset, idxOffset};
+  }
+
+  function buildAccessorsAndMeshes(gltf, meshes, nodes, allPositions, packed){
+    const {posOffset, normOffset, uvOffset, idxOffset} = packed;
+    gltf.bufferViews.push({buffer:0, byteOffset: posOffset, byteLength: normOffset-posOffset, target: 34962});
+    gltf.bufferViews.push({buffer:0, byteOffset: normOffset, byteLength: uvOffset-normOffset, target: 34962});
+    gltf.bufferViews.push({buffer:0, byteOffset: uvOffset, byteLength: idxOffset-uvOffset, target: 34962});
+    gltf.bufferViews.push({buffer:0, byteOffset: idxOffset, byteLength: packed.bytes.length-idxOffset, target: 34963});
+
+    meshes.forEach((m, i) => {
+      const slice = allPositions.slice(m.vertexStart, m.vertexStart + m.vertexCount);
+      const xs = slice.map(p=>p[0]), ys = slice.map(p=>p[1]), zs = slice.map(p=>p[2]);
+
+      const posAcc = gltf.accessors.length;
+      gltf.accessors.push({bufferView:0, byteOffset: m.vertexStart*12, componentType:5126, count:m.vertexCount, type:"VEC3",
+        min:[Math.min(...xs),Math.min(...ys),Math.min(...zs)], max:[Math.max(...xs),Math.max(...ys),Math.max(...zs)]});
+      const normAcc = gltf.accessors.length;
+      gltf.accessors.push({bufferView:1, byteOffset: m.vertexStart*12, componentType:5126, count:m.vertexCount, type:"VEC3"});
+      const uvAcc = gltf.accessors.length;
+      gltf.accessors.push({bufferView:2, byteOffset: m.vertexStart*8, componentType:5126, count:m.vertexCount, type:"VEC2"});
+      const idxAcc = gltf.accessors.length;
+      gltf.accessors.push({bufferView:3, byteOffset: m.indexStart*4, componentType:5125, count:m.indexCount, type:"SCALAR"});
+
+      gltf.meshes.push({
+        name: nodes[i].name,
+        primitives: [{attributes:{POSITION:posAcc, NORMAL:normAcc, TEXCOORD_0:uvAcc}, indices: idxAcc, material: 0}]
+      });
+    });
+  }
+
+  /**
+   * Convert a parsed Tabula model + optional texture into a glTF 2.0 JSON string.
+   * @param {object} model - parsed model.json (Tabula cuboid tree)
+   * @param {ArrayBuffer|null} texBytes - raw texture bytes (or null if no texture)
+   * @param {string} texMime - e.g. 'image/png'
+   * @returns {string} glTF JSON string
+   */
+  function exportGLTF(model, texBytes, texMime){
+    const TW = model.textureWidth || 64;
+    const TH = model.textureHeight || 32;
+    const {allPositions, allNormals, allUVs, allIndices, nodes, meshes, rootIndices} = buildGltfCommon(model, TW, TH);
+    const packed = packBuffer(allPositions, allNormals, allUVs, allIndices);
+    const bufferB64 = arrayBufferToBase64(packed.bytes.buffer);
+    const texB64 = texBytes ? arrayBufferToBase64(texBytes) : null;
+
+    const gltf = {
+      asset: {version:"2.0", generator:"Minecraft Mod Model Extractor (RUHANShFx)"},
+      scene: 0,
+      scenes: [{nodes: rootIndices}],
+      nodes, meshes: [],
+      materials: [{
+        name: "Skin",
+        pbrMetallicRoughness: {
+          baseColorTexture: texB64 ? {index:0} : undefined,
+          metallicFactor: 0.0, roughnessFactor: 1.0
+        },
+        alphaMode: "MASK"
+      }],
+      textures: texB64 ? [{source:0, sampler:0}] : [],
+      samplers: texB64 ? [{magFilter:9728, minFilter:9728}] : [],
+      images: texB64 ? [{uri: `data:${texMime};base64,${texB64}`}] : [],
+      buffers: [{uri: `data:application/octet-stream;base64,${bufferB64}`, byteLength: packed.bytes.length}],
+      bufferViews: [],
+      accessors: []
+    };
+    buildAccessorsAndMeshes(gltf, meshes, nodes, allPositions, packed);
+    return JSON.stringify(gltf);
+  }
+
+  return { exportGLTF, countCubes, arrayBufferToBase64 };
+})();
+
+</script>
+<script>
+/* ============================================================
+   JarPipeline — recursively scans a Minecraft .jar for .tbl
+   (Tabula) models, converts each to .gltf using TblConverter,
+   and packages the results into a downloadable ZIP.
+
+   Processing is sequential (one .tbl at a time) to keep memory
+   usage flat and predictable even on mods with hundreds of
+   models — nothing large is held in memory longer than needed.
+   ============================================================ */
+const JarPipeline = (function(){
+
+  /**
+   * Recursively list every .tbl entry inside a loaded JSZip instance.
+   * JSZip already exposes the full relative path per entry (including
+   * nested folders), so no manual directory walking is required —
+   * we just filter the flat entry list.
+   */
+  function findTblEntries(jarZip){
+    const found = [];
+    jarZip.forEach((relPath, entry) => {
+      if (entry.dir) return;
+      if (/\.tbl$/i.test(relPath)){
+        found.push({path: relPath, entry});
+      }
+    });
+    return found;
+  }
+
+  /**
+   * A .tbl file is itself a zip archive containing model.json plus an
+   * optional texture image. Unpack it and hand off to TblConverter.
+   */
+  async function convertSingleTbl(tblEntry){
+    const arrayBuf = await tblEntry.async('arraybuffer');
+
+    let innerZip;
+    try {
+      innerZip = await JSZip.loadAsync(arrayBuf);
+    } catch (e){
+      throw new Error('not a valid .tbl archive (corrupted or unsupported)');
+    }
+
+    let modelEntry = null, textureEntry = null, textureExt = 'png';
+    innerZip.forEach((path, entry) => {
+      const lower = path.toLowerCase();
+      if (lower.endsWith('.json')) modelEntry = entry;
+      else if (lower.endsWith('.png')) { textureEntry = entry; textureExt = 'png'; }
+      else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) { textureEntry = entry; textureExt = 'jpeg'; }
+    });
+
+    if (!modelEntry) throw new Error('no model.json found inside .tbl');
+
+    const modelText = await modelEntry.async('string');
+    let model;
+    try {
+      model = JSON.parse(modelText);
+    } catch (e){
+      throw new Error('model.json is not valid JSON');
+    }
+    if (!model.cubes) throw new Error('model.json has no cuboid data');
+
+    let texBytes = null, texMime = 'image/png';
+    if (textureEntry){
+      texBytes = await textureEntry.async('arraybuffer');
+      texMime = textureExt === 'jpeg' ? 'image/jpeg' : 'image/png';
+    }
+
+    const gltfString = TblConverter.exportGLTF(model, texBytes, texMime);
+    const cubeCount = TblConverter.countCubes(model);
+    return { gltfString, cubeCount };
+  }
+
+  /**
+   * Full pipeline: load the .jar, find every .tbl, convert each one,
+   * and build an output ZIP mirroring the original folder structure
+   * (only the extension changes: foo/bar.tbl -> foo/bar.gltf).
+   *
+   * @param {File} jarFile
+   * @param {object} hooks - { onStage, onDiscovered, onModelStart, onModelDone, onModelError }
+   * @returns {Promise<{outputBlob: Blob, results: Array, discoveredCount: number}>}
+   */
+  async function processJar(jarFile, hooks = {}){
+    const noop = () => {};
+    const onStage = hooks.onStage || noop;
+    const onDiscovered = hooks.onDiscovered || noop;
+    const onModelStart = hooks.onModelStart || noop;
+    const onModelDone = hooks.onModelDone || noop;
+    const onModelError = hooks.onModelError || noop;
+
+    onStage({stage:'reading', message:'Reading .jar archive…'});
+    const jarBuf = await jarFile.arrayBuffer();
+
+    onStage({stage:'extracting', message:'Extracting archive contents…'});
+    let jarZip;
+    try {
+      jarZip = await JSZip.loadAsync(jarBuf);
+    } catch (e){
+      throw new Error('This does not look like a valid .jar/.zip file.');
+    }
+
+    onStage({stage:'scanning', message:'Scanning every folder for .tbl models…'});
+    const tblEntries = findTblEntries(jarZip);
+    onDiscovered(tblEntries.map(e => e.path));
+
+    const outputZip = new JSZip();
+    const results = [];
+
+    for (let i = 0; i < tblEntries.length; i++){
+      const { path, entry } = tblEntries[i];
+      onModelStart(path, i, tblEntries.length);
+      try {
+        const { gltfString, cubeCount } = await convertSingleTbl(entry);
+        const outPath = path.replace(/\.tbl$/i, '.gltf');
+        outputZip.file(outPath, gltfString);
+        results.push({ path, outPath, status: 'ok', cubeCount });
+        onModelDone(path, outPath, cubeCount, i, tblEntries.length);
+      } catch (err){
+        results.push({ path, status: 'error', message: err.message });
+        onModelError(path, err.message, i, tblEntries.length);
+      }
+      // Yield back to the event loop between files so the UI stays
+      // responsive and memory from this iteration can be reclaimed.
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    onStage({stage:'packaging', message:'Packaging converted models into a ZIP…'});
+    const outputBlob = await outputZip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    }, (meta) => {
+      onStage({stage:'packaging', message:'Packaging…', percent: meta.percent});
+    });
+
+    onStage({stage:'done', message:'Done.'});
+    return { outputBlob, results, discoveredCount: tblEntries.length };
+  }
+
+  return { processJar, findTblEntries, convertSingleTbl };
+})();
+
+</script>
+<script>
+/* ============================================================
+   App — wires the upload UI to JarPipeline and renders live
+   progress, the discovered model list, and the final download.
+   ============================================================ */
+(function(){
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const filecard = document.getElementById('filecard');
+  const fcName = document.getElementById('fc-name');
+  const fcSize = document.getElementById('fc-size');
+  const fcStatus = document.getElementById('fc-status');
+  const convertBtn = document.getElementById('convertBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const progressBlock = document.getElementById('progressBlock');
+  const progressLabel = document.getElementById('progressLabel');
+  const progressValue = document.getElementById('progressValue');
+  const progressFill = document.getElementById('progressFill');
+  const modelList = document.getElementById('modelList');
+  const statGrid = document.getElementById('statGrid');
+  const statDiscovered = document.getElementById('statDiscovered');
+  const statConverted = document.getElementById('statConverted');
+  const statErrors = document.getElementById('statErrors');
+
+  let currentFile = null;
+  let resultBlob = null;
+  let resultName = 'converted-models.zip';
+  const rowByPath = new Map();
+
+  // ---------- toast notifications ----------
+  function toast(message, type = 'info'){
+    const stack = document.getElementById('toast-stack');
+    if (!stack) return;
+    const el = document.createElement('div');
+    el.className = 'toast ' + type;
+    el.innerHTML = `<span class="dot"></span><span>${message}</span>`;
+    stack.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s ease'; setTimeout(() => el.remove(), 300); }, 4200);
+  }
+
+  function fmtSize(bytes){
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/1024/1024).toFixed(2) + ' MB';
+  }
+
+  function setProgress(percent, label, value){
+    progressBlock.style.display = 'block';
+    progressFill.style.width = Math.max(0, Math.min(100, percent)) + '%';
+    if (label !== undefined) progressLabel.textContent = label;
+    if (value !== undefined) progressValue.textContent = value;
+  }
+
+  function resetUI(){
+    modelList.innerHTML = '';
+    modelList.style.display = 'none';
+    statGrid.style.display = 'none';
+    progressBlock.style.display = 'none';
+    downloadBtn.disabled = true;
+    resultBlob = null;
+    rowByPath.clear();
+  }
+
+  function handleFile(file){
+    if (!/\.jar$/i.test(file.name)){
+      toast('Please choose a .jar file.', 'err');
+      return;
+    }
+    currentFile = file;
+    resetUI();
+    fcName.textContent = file.name;
+    fcSize.textContent = fmtSize(file.size);
+    fcStatus.textContent = 'ready';
+    fcStatus.className = 'status-pill';
+    filecard.classList.add('show');
+    convertBtn.disabled = false;
+  }
+
+  // ---------- drag & drop / file picker ----------
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+  ['dragenter','dragover'].forEach(evt => dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(evt => dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('drag'); }));
+  dropzone.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+
+  // ---------- ripple effect on buttons ----------
+  document.querySelectorAll('.btn').forEach(btn => {
+    btn.addEventListener('click', function(e){
+      const rect = this.getBoundingClientRect();
+      const ripple = document.createElement('span');
+      ripple.className = 'ripple';
+      ripple.style.left = (e.clientX - rect.left - 10) + 'px';
+      ripple.style.top = (e.clientY - rect.top - 10) + 'px';
+      ripple.style.width = ripple.style.height = '20px';
+      this.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 600);
+    });
+  });
+
+  // ---------- model list rendering ----------
+  function addModelRow(path){
+    const row = document.createElement('div');
+    row.className = 'model-row';
+    row.innerHTML = `<span class="dot pending"></span><span class="path">${escapeHtml(path)}</span>`;
+    modelList.appendChild(row);
+    rowByPath.set(path, row);
+  }
+  function updateModelRow(path, status, note){
+    const row = rowByPath.get(path);
+    if (!row) return;
+    const dot = row.querySelector('.dot');
+    dot.className = 'dot ' + status;
+    if (note) row.querySelector('.path').innerHTML = `${escapeHtml(path)} <b>${escapeHtml(note)}</b>`;
+  }
+  function escapeHtml(s){
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // ---------- conversion pipeline ----------
+  convertBtn.addEventListener('click', async () => {
+    if (!currentFile) return;
+    convertBtn.disabled = true;
+    downloadBtn.disabled = true;
+    resetUI();
+    fcStatus.textContent = 'working…';
+    fcStatus.className = 'status-pill busy';
+
+    let okCount = 0, errCount = 0;
+
+    try {
+      const { outputBlob, results, discoveredCount } = await JarPipeline.processJar(currentFile, {
+        onStage: (s) => {
+          if (s.stage === 'reading') setProgress(5, s.message, '');
+          else if (s.stage === 'extracting') setProgress(15, s.message, '');
+          else if (s.stage === 'scanning') setProgress(25, s.message, '');
+          else if (s.stage === 'packaging') setProgress(90 + (s.percent||0)/10, s.message, s.percent ? Math.round(s.percent)+'%' : '');
+          else if (s.stage === 'done') setProgress(100, 'Conversion complete', '100%');
+        },
+        onDiscovered: (paths) => {
+          if (paths.length === 0){
+            toast('No .tbl models found inside this .jar.', 'err');
+          } else {
+            modelList.style.display = 'block';
+            paths.forEach(addModelRow);
+            statGrid.style.display = 'grid';
+            statDiscovered.textContent = paths.length;
+          }
+        },
+        onModelStart: (path, i, total) => {
+          updateModelRow(path, 'busy');
+          setProgress(25 + (i/total)*65, 'Converting ' + (i+1) + ' / ' + total, path.split('/').pop());
+        },
+        onModelDone: (path, outPath, cubeCount, i, total) => {
+          okCount++;
+          updateModelRow(path, 'ok', cubeCount + ' cubes');
+          statConverted.textContent = okCount;
+        },
+        onModelError: (path, msg, i, total) => {
+          errCount++;
+          updateModelRow(path, 'err', msg);
+          statErrors.textContent = errCount;
+          statErrors.parentElement.style.display = errCount ? 'block' : 'none';
+        },
+      });
+
+      resultBlob = outputBlob;
+      resultName = currentFile.name.replace(/\.jar$/i, '') + '_gltf_models.zip';
+
+      if (discoveredCount === 0){
+        fcStatus.textContent = 'no models found';
+        fcStatus.className = 'status-pill err';
+      } else if (errCount === 0){
+        fcStatus.textContent = 'done';
+        fcStatus.className = 'status-pill ok';
+        toast(`Converted ${okCount} model${okCount===1?'':'s'} successfully.`, 'ok');
+        downloadBtn.disabled = false;
+      } else {
+        fcStatus.textContent = okCount + ' ok · ' + errCount + ' failed';
+        fcStatus.className = 'status-pill busy';
+        toast(`Converted ${okCount}, ${errCount} failed — check the list below.`, 'err');
+        if (okCount > 0) downloadBtn.disabled = false;
+      }
+    } catch (err){
+      fcStatus.textContent = 'failed';
+      fcStatus.className = 'status-pill err';
+      toast('Something went wrong: ' + err.message, 'err');
+    } finally {
+      convertBtn.disabled = false;
+    }
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    if (!resultBlob) return;
+    const url = URL.createObjectURL(resultBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = resultName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Download started.', 'ok');
+  });
+
+  // ---------- FAQ accordion (shared component, used on faq.html) ----------
+  document.querySelectorAll('.faq-q').forEach(q => {
+    q.addEventListener('click', () => {
+      const item = q.closest('.faq-item');
+      const answer = item.querySelector('.faq-a');
+      const wasOpen = item.classList.contains('open');
+      item.classList.toggle('open', !wasOpen);
+      answer.style.maxHeight = wasOpen ? '0px' : answer.scrollHeight + 'px';
+    });
+  });
+})();
+
+</script>
+<script>
+
+// ---------- single-page navigation (no reloads, no separate files) ----------
+(function(){
+  const links = document.querySelectorAll('a[data-page]');
+  const sections = document.querySelectorAll('.page-section');
+  function showPage(pageId){
+    sections.forEach(s => s.classList.toggle('active', s.id === 'page-' + pageId));
+    links.forEach(l => l.classList.toggle('active', l.dataset.page === pageId));
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  links.forEach(l => {
+    l.addEventListener('click', (e) => {
+      e.preventDefault();
+      showPage(l.dataset.page);
+      history.replaceState(null, '', '#' + l.dataset.page);
+    });
+  });
+  const initial = (location.hash || '#home').slice(1);
+  showPage(['home','documentation','faq','changelog','privacy'].includes(initial) ? initial : 'home');
+})();
+
+</script>
+</body>
+</html>
